@@ -33,13 +33,13 @@ ELOBOT/
 ├── api.py                  ← Servidor FastAPI (puente Python ↔ Java)
 ├── queries.py              ← Lógica RAG: embedding + búsqueda en MongoDB
 ├── respuestas_bro.py       ← Llama a Gemini con el contexto recuperado
-├── cargar_datos.py         ← Script para poblar la base de datos
 ├── docker-compose.yml      ← Levanta MongoDB
 ├── requirements.txt        ← Dependencias Python
 ├── .env                    ← API keys (NO subir al repo)
 ├── .env.example            ← Plantilla de variables de entorno
+├── RAMOS_Y_PREGUNTAS.md    ← Lista de los 84 ramos disponibles y preguntas de prueba
 ├── data/
-│   └── dump_rag_db.gz      ← Backup de la base de datos
+│   └── universidad_rag.programas_asignaturas.json  ← 840 chunks con embeddings
 └── frontend/
     └── ElobotChat.java     ← Chatbot con interfaz gráfica (Java Swing)
 ```
@@ -49,8 +49,8 @@ ELOBOT/
 ### 1. Clonar el repositorio y configurar variables de entorno
 
 ```bash
-git clone <url-del-repo>
-cd ELOBOT
+git clone https://github.com/Carlos-creator/ELO-BOT.git
+cd ELO-BOT
 cp .env.example .env
 # Editar .env y agregar tu API key de Gemini
 ```
@@ -69,17 +69,17 @@ docker compose up -d
 
 ### 4. Poblar la base de datos
 
-**Opción A — Desde el backup:**
+Importar los 840 chunks (84 asignaturas) desde el JSON incluido en el repositorio:
+
 ```powershell
-docker cp data\dump_rag_db.gz mongo_rag_db:/tmp/dump_rag_db.gz
-docker exec mongo_rag_db mongorestore --username rag_user --password rag_password_2026 --authenticationDatabase admin --archive=/tmp/dump_rag_db.gz --gzip
+docker cp "data\universidad_rag.programas_asignaturas.json" mongo_rag_db:/tmp/datos.json
+docker exec mongo_rag_db mongoimport --username rag_user --password rag_password_2026 --authenticationDatabase admin --db universidad_rag --collection programas_asignaturas --file /tmp/datos.json --jsonArray
 ```
 
-**Opción B — Desde los archivos fuente (PDFs o .txt):**
-```bash
-python cargar_datos.py
-```
-> Coloca los archivos de los programas de asignatura en la carpeta `data/programas/` antes de ejecutar.
+> Para reimportar desde cero (si ya hay datos), borra la colección primero:
+> ```powershell
+> docker exec mongo_rag_db mongosh -u rag_user -p rag_password_2026 --authenticationDatabase admin --eval "db.getSiblingDB('universidad_rag').programas_asignaturas.drop()"
+> ```
 
 ## Ejecutar el sistema
 
