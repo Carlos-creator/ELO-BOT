@@ -6,9 +6,19 @@ from queries import recuperar_contexto_rag, armar_prompt_llm
 load_dotenv()
 
 # ==========================================
-# CONFIGURACIÓN DEL LLM (NUEVA LIBRERÍA GENAI)
+# ROTACIÓN DE API KEYS (FALLBACK)
+# Se intentan en orden; si una falla (cuota agotada), pasa a la siguiente.
 # ==========================================
-cliente_gemini = genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
+_raw_keys = [
+    os.getenv("GEMINI_API_KEY_1"),
+    os.getenv("GEMINI_API_KEY_2"),
+    os.getenv("GEMINI_API_KEY_3"),
+    os.getenv("GEMINI_API_KEY_4"),
+]
+CLIENTES_GEMINI = [genai.Client(api_key=k) for k in _raw_keys if k]
+
+if not CLIENTES_GEMINI:
+    raise RuntimeError("No hay API keys configuradas. Revisa tu .env")
 
 # ==========================================
 # EJECUCIÓN DEL FLUJO COMPLETO
@@ -23,13 +33,19 @@ def consultar_asistente_universitario(pregunta, codigo_ramo):
         return contexto
 
     prompt = armar_prompt_llm(pregunta, contexto)
-    print("Enviando contexto al LLM para redactar la respuesta...")
 
-    respuesta = cliente_gemini.models.generate_content(
-        model='gemini-2.5-flash',
-        contents=prompt
-    )
-    return respuesta.text
+    for i, cliente in enumerate(CLIENTES_GEMINI):
+        try:
+            print(f"Enviando al LLM (key {i + 1}/{len(CLIENTES_GEMINI)})...")
+            respuesta = cliente.models.generate_content(
+                model='gemini-2.5-flash',
+                contents=prompt
+            )
+            return respuesta.text
+        except Exception as e:
+            print(f"⚠️  Key {i + 1} falló: {e}")
+
+    return "❌ Todas las API keys están agotadas o fallaron. Intenta más tarde."
 
 if __name__ == "__main__":
     codigo_prueba = "ELO-329"
